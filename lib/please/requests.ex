@@ -145,14 +145,15 @@ defmodule Please.Requests do
   end
 
   def handle(%Request{} = request) do
-    if request.node == Node.self() do
+    self_node = Node.self()
+    if request.node == self_node do
       spawn(fn ->
         try do
           output = apply(request.module, request.function, request.args)
-          send(request.pid, {__MODULE__, :response, request.id, Node.self(), output})
+          send(request.pid, {__MODULE__, :response, request.id, self_node, output})
         rescue
           error ->
-            send(request.pid, {__MODULE__, :error, request, Node.self(), error})
+            send(request.pid, {__MODULE__, :error, request, self_node, error})
         end
       end)
 
@@ -170,7 +171,7 @@ defmodule Please.Requests do
             output = apply(request.module, request.function, request.args)
 
             Agent.cast({__MODULE__, request.node}, fn state ->
-              send(request.pid, {__MODULE__, :response, request.id, Node.self(), output})
+              send(request.pid, {__MODULE__, :response, request.id, self_node, output})
 
               {
                 Enum.reject(elem(state, 0), &(&1.id == request.id)),
@@ -180,7 +181,7 @@ defmodule Please.Requests do
             end)
           rescue
             error ->
-              send(request.pid, {__MODULE__, :error, request, Node.self(), error})
+              send(request.pid, {__MODULE__, :error, request, self_node, error})
 
               Agent.cast({__MODULE__, request.node}, fn state ->
                 {
